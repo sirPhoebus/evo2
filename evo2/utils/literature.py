@@ -105,6 +105,8 @@ class LiteratureStore:
             r'\b[a-z]{4,}(?:_[a-z]+)+\b',  # snake_case (e.g., learning_rate)
             r'\b[A-Z][a-z]{2,}[A-Z][a-zA-Z0-9-]+\b', # CamelCase (e.g., AgentOrchestra, MultiAgent)
             r'\b[A-Z]{3,}\b',  # Acronyms (e.g., GAIA, MCP, PPO)
+            r'\b[A-Z][a-z]+(?:\s+[a-z]+){1,2}\b', # Multi-word Title Case (Max 3 words)
+            r'\b[A-Z][a-z]{3,}\b', # Simple Capitalized words (e.g. Agent, Reward)
         ]
         
         from collections import Counter
@@ -114,8 +116,27 @@ class LiteratureStore:
             word_counts.update(words)
             
         # Filter out common non-research words and short words
-        stop_words = {"this", "that", "with", "from", "their", "those", "these", "result", "framework", "system", "method", "paper", "Value", "Metric"}
-        metadata["topics"] = [k for k, count in word_counts.items() if k.lower() not in stop_words and count >= 1]
+        stop_words = {
+            "this", "that", "with", "from", "their", "those", "these", "result", "framework", "system", "method", "paper", "value", "metric",
+            "intro", "conclusion", "summary", "chapter", "section", "table", "figure", "case", "study", "work", "time", "year", "data",
+            "model", "approach", "based", "using", "used", "such", "each", "both", "most", "many", "some", "other", "into", "over", "than", "then",
+            "causes", "leads", "affects", "impacts", "increases", "decreases", "cause", "lead", "affect", "impact", "increase", "decrease" # Verbs to avoid in concepts
+        }
+        
+        valid_topics = []
+        for k, count in word_counts.items():
+            if count < 1: continue
+            k_lower = k.lower()
+            
+            # Check if whole phrase is a stop word
+            if k_lower in stop_words: continue
+            
+            # Check if phrase *contains* a stop word (e.g. "causes")
+            if any(w in stop_words for w in k_lower.split()): continue
+            
+            valid_topics.append(k)
+            
+        metadata["topics"] = valid_topics
         
         return metadata
         

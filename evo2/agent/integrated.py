@@ -656,32 +656,48 @@ class IntegratedAgent:
                 for var in variables:
                     data[var] = np.random.normal(0, 1, sample_size)
             
-            elif plan["type"] == "causal_test":
-                # Generate data with potential causal relationship
+            elif plan["type"] == "causal_test" or plan["type"] == "validation":
+                # Generate data with potential causal relationship based on GROUND TRUTH
                 if len(variables) >= 2:
-                    cause = np.random.normal(0, 1, sample_size)
-                    # Use a stronger relationship to ensure discovery
-                    # We can use a deterministic but variable strength based on names
-                    strength = 0.5 + (hash(variables[0] + variables[1]) % 50) / 100.0
-                    effect = strength * cause + np.random.normal(0, 0.2, sample_size)
-                    data[variables[0]] = cause
-                    data[variables[1]] = effect
-            
-            elif plan["type"] == "validation":
-                # Generate data to validate existing relationship
-                if len(variables) >= 2:
-                    # Look up existing edge strength
-                    edge_id = None
-                    for eid, edge in self.causal_model.edges.items():
-                        if edge["source"] in variables and edge["target"] in variables:
-                            edge_id = eid
+                    cause_var = variables[0]
+                    effect_var = variables[1]
+                    
+                    # GROUND TRUTH ORACLE (Scientific Rigor)
+                    # Defining the actual laws of the simulation universe
+                    truth_rules = [
+                        ("Exploration", "discovery of better policies"),
+                        ("High discount factor", "preference for long-term rewards"),
+                        ("Large positive rewards", "faster learning of actions"),
+                        ("Negative rewards", "avoidance of actions"),
+                        # Variations for robustness
+                        ("Exploration", "better policies"),
+                        ("High discount", "long-term rewards"),
+                        ("Positive rewards", "faster learning"),
+                        ("Negative rewards", "avoidance")
+                    ]
+                    
+                    true_strength = 0.05 # Default: No relationship (Noise)
+                    
+                    # Check if this pair matches a known truth
+                    for t_cause, t_effect in truth_rules:
+                        # Fuzzy match: check if key phrases appear in the variables
+                        # We normalize by lowercasing for checking
+                        c_lower = cause_var.lower()
+                        e_lower = effect_var.lower()
+                        tc_lower = t_cause.lower()
+                        te_lower = t_effect.lower()
+                        
+                        if (tc_lower in c_lower and te_lower in e_lower):
+                            true_strength = 0.95 # Strong relationship
                             break
                     
-                    strength = self.causal_model.edges[edge_id]["strength"] if edge_id else 0.3
+                    # Generate data based on True Strength
+                    sample_size = plan.get("sample_size", 30)
                     cause = np.random.normal(0, 1, sample_size)
-                    effect = strength * cause + np.random.normal(0, 0.5, sample_size)
-                    data[variables[0]] = cause
-                    data[variables[1]] = effect
+                    effect = true_strength * cause + np.random.normal(0, 0.2, sample_size)
+                    
+                    data[cause_var] = cause
+                    data[effect_var] = effect
             
             return data
         
@@ -790,24 +806,65 @@ class IntegratedAgent:
                             
                         # Check if edge already exists
                         exists = False
-                        for edge in self.causal_model.edges.values():
+                        edge_id = f"{src_id}->{tgt_id}"
+                        current_edge = None
+                        
+                        for eid, edge in self.causal_model.edges.items():
                             if edge["source"] == src_id and edge["target"] == tgt_id:
                                 exists = True
+                                current_edge = edge
+                                edge_id = eid
                                 break
-                        if exists: continue
                         
                         # Calculate correlation
                         src_vals = id_data[src_id]
                         tgt_vals = id_data[tgt_id]
-                        if len(src_vals) > 5: # Min samples
+                        
+                        if len(src_vals) > 10: # Increased from 5 to 10
                             corr = np.corrcoef(src_vals, tgt_vals)[0, 1]
-                            # print(f"DEBUG: Corr {src_name}->{tgt_name} = {corr}")
-                            if not np.isnan(corr) and abs(corr) > 0.4: # Lower Threshold
+                            
+                            if np.isnan(corr):
+                                continue
+                                
+                            abs_corr = abs(corr)
+                            
+                            # 1. Negative Evidence (Pruning)
+                            if exists:
+                                # If correlation is weak, weaken the edge
+                                if abs_corr < 0.2:
+                                    # Decay strength
+                                    new_strength = current_edge.get("strength", 0.5) * 0.8
+                                    self.causal_model.edges[edge_id]["strength"] = new_strength
+                                    
+                                    rationale = f"Weakened due to low correlation {abs_corr:.2f}"
+                                    print(f"DEBUG: {rationale} for {src_name}->{tgt_name}")
+                                    
+                                    # Prune if too weak
+                                    if new_strength < 0.3:
+                                        del self.causal_model.edges[edge_id]
+                                        rationale = f"PRUNED due to strength {new_strength:.2f} < 0.3"
+                                        print(f"DEBUG: {rationale} for {src_name}->{tgt_name}")
+                                        # Use a special key for negative learning
+                                        update_result.setdefault("pruned_edges", []).append(f"{src_name}->{tgt_name}")
+                                
+                                # Reinforce if strong validation
+                                elif abs_corr > 0.8:
+                                    new_strength = min(1.0, current_edge.get("strength", 0.5) * 1.1)
+                                    self.causal_model.edges[edge_id]["strength"] = new_strength
+                                     
+                            # 2. Discovery (New Edges)
+                            elif abs_corr > 0.85: # Increased from 0.4 to 0.85
                                 try:
-                                    self.causal_model.add_edge(src_id, tgt_id, strength=abs(corr))
+                                    self.causal_model.add_edge(src_id, tgt_id, strength=abs_corr)
                                     new_discoveries += 1
-                                    print(f"DEBUG: Discovered {src_name} -> {tgt_name} ({corr:.2f})")
+                                    rationale = f"Discovered (Corr: {abs_corr:.2f} > 0.85)"
+                                    print(f"DEBUG: {rationale} for {src_name} -> {tgt_name}")
+                                    update_result.setdefault("discoveries", []).append({
+                                        "edge": f"{src_name}->{tgt_name}",
+                                        "rationale": rationale
+                                    })
                                 except ValueError:
+                                    pass
                                     pass # Cycle or max parents reached
         
         # Analyze results for causal insights
