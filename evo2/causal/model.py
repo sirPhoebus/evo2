@@ -352,34 +352,41 @@ class CausalModel:
         
         return adj_matrix
     
-    def get_topological_order(self) -> List[str]:
-        """Get a topological ordering of variables.
+    def get_summary(self) -> Dict[str, Any]:
+        """Get a summary of the causal model.
         
         Returns:
-            List of variable IDs in topological order.
+            Summary dictionary.
         """
-        # Kahn's algorithm for topological sorting
-        in_degree = {var_id: 0 for var_id in self.variables}
+        return {
+            "num_variables": len(self.variables),
+            "num_edges": len(self.edges),
+            "variables": {var_id: var["name"] for var_id, var in self.variables.items()},
+            "edges": list(self.edges.keys()),
+            "learning_rate": self.config.learning_rate,
+            "update_count": self._update_count
+        }
+    
+    def get_variable_statistics(self, variable_id: str) -> Optional[Dict[str, float]]:
+        """Get statistics for a variable.
         
-        # Calculate in-degrees
-        for edge in self.edges.values():
-            in_degree[edge["target"]] += 1
-        
-        # Queue of nodes with no incoming edges
-        queue = [var_id for var_id, degree in in_degree.items() if degree == 0]
-        result = []
-        
-        while queue:
-            current = queue.pop(0)
-            result.append(current)
+        Args:
+            variable_id: ID of the variable.
             
-            # Remove outgoing edges and update in-degrees
-            for child_id in self.get_children(current):
-                in_degree[child_id] -= 1
-                if in_degree[child_id] == 0:
-                    queue.append(child_id)
+        Returns:
+            Statistics dictionary or None if not found.
+        """
+        if variable_id not in self.variables:
+            return None
         
-        return result
+        stats = self._variable_stats.get(variable_id, {})
+        return {
+            "mean": stats.get("mean", 0.0),
+            "std": stats.get("std", 0.0),
+            "min": stats.get("min", 0.0),
+            "max": stats.get("max", 0.0),
+            "count": stats.get("count", 0)
+        }
     
     def _get_timestamp(self) -> float:
         """Get current timestamp.
