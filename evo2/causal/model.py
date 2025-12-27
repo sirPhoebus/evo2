@@ -68,8 +68,9 @@ class CausalModel:
         Returns:
             Variable ID.
         """
-        if len(self.variables) >= self.config.num_variables:
-            raise ValueError(f"Maximum number of variables ({self.config.num_variables}) reached")
+        # Relaxed limit for organic growth
+        # if len(self.variables) >= self.config.num_variables:
+        #     raise ValueError(f"Maximum number of variables ({self.config.num_variables}) reached")
         
         var_id = str(uuid.uuid4())
         
@@ -358,9 +359,15 @@ class CausalModel:
         Returns:
             Summary dictionary.
         """
+        # Calculate edge density: E / (V * (V-1)) if V > 1
+        n_vars = len(self.variables)
+        n_edges = len(self.edges)
+        density = n_edges / (n_vars * (n_vars - 1)) if n_vars > 1 else 0
+        
         return {
-            "num_variables": len(self.variables),
-            "num_edges": len(self.edges),
+            "num_variables": n_vars,
+            "num_edges": n_edges,
+            "edge_density": density,
             "variables": {var_id: var["name"] for var_id, var in self.variables.items()},
             "edges": list(self.edges.keys()),
             "learning_rate": self.config.learning_rate,
