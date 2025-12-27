@@ -3,7 +3,7 @@
 
 ## 1. Does the agent learn to think like a scientist?
 **Analysis of Hypothesis Generation:**
-- **Hypothesis Diversity**: 0.0015 (Unique Types: ['model_validation', 'causal_testing', 'variable_addition'])
+- **Hypothesis Diversity**: 0.0116 (Unique Types: ['causal_testing', 'model_validation', 'variable_addition'])
 - **Decision Confidence**: 0.2922
 - **Confidence Profile**: {'EXECUTE': 20}
 
@@ -18,11 +18,11 @@
 - **Early Success Rate**: 100.00%
 - **Late Success Rate**: 100.00%
 - **Improvement Trend**: NEUTRAL/NEGATIVE (0.00%)
-- **Total Experiments Run**: 2999
+- **Total Experiments Run**: 299
 
 ## 4. Does its causal model become more accurate/complex?
 **Knowledge Graph Quality:**
-- **Complexity**: 123 variables, 543 edges
-- **Graph Density**: 0.0362
-- **Connectivity Index**: 0.4587
+- **Complexity**: 123 variables, 140 edges
+- **Graph Density**: 0.0093
+- **Connectivity Index**: 0.0795
 - **Discovery Efficiency**: 1.00 discoveries per event

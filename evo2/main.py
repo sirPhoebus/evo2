@@ -32,6 +32,7 @@ def main() -> int:
     parser.add_argument("--save-path", type=str, default="checkpoints/agent_v1.pth", help="Path to save final agent")
     parser.add_argument("--log-level", type=str, default="INFO", help="Logging level")
     parser.add_argument("--visual", action="store_true", help="Enable simulation dashboard")
+    parser.add_argument("--fresh", action="store_true", help="Ignore existing checkpoints and start fresh")
     args = parser.parse_args()
 
     setup_logging(args.log_level, silent=args.visual)
@@ -43,7 +44,12 @@ def main() -> int:
         if args.checkpoint:
             logger.info(f"Loading agent from {args.checkpoint}")
             agent = IntegratedAgent.load_checkpoint(args.checkpoint)
+        elif not args.fresh and Path(args.save_path).exists():
+             logger.info(f"Auto-resuming from existing checkpoint at {args.save_path}")
+             agent = IntegratedAgent.load_checkpoint(args.save_path)
         else:
+            if args.fresh:
+                logger.info("Fresh start requested. Ignoring existing checkpoints.")
             config = IntegratedAgentConfig(agent_name=args.name)
             agent = IntegratedAgent(config)
             
